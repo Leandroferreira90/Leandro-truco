@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="pt-BR"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Truco Paulista</title>
+<style>
+:root{--felt:#14532d;--felt2:#0b3d20;--ink:#f5f1e6;--gold:#facc15;--card:#fffdf7;--w:64px;--h:92px;color-scheme:dark;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media(min-width:600px){:root{--w:84px;--h:120px}}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0}
+body{background:radial-gradient(circle at 50% 40%,var(--felt),var(--felt2));color:var(--ink);font-family:system-ui,sans-serif;display:flex;flex-direction:column;user-select:none;-webkit-user-select:none;overflow:hidden}
+header{display:flex;justify-content:space-between;align-items:center;padding:8px 14px;background:#0006;font-weight:600;gap:8px}
+header b{font-size:1.4em;color:var(--gold)}
+#info{font-size:.8em;text-align:center;opacity:.9}
+#snd{padding:6px 10px;min-height:0;background:#fff2;color:#fff}
+main{flex:1;display:flex;flex-direction:column;justify-content:space-around;align-items:center;padding:6px;min-height:0}
+.row{display:flex;gap:8px;justify-content:center;align-items:center;min-height:calc(var(--h) + 4px)}
+#mid{width:100%;justify-content:space-between;padding:0 8px}
+#viraBox{text-align:center;font-size:.7em;opacity:.95}
+#table{flex:1;gap:12px}
+.card{width:var(--w);height:var(--h);background:var(--card);color:#111;border-radius:8px;box-shadow:0 2px 6px #0008;position:relative;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:calc(var(--w)*.34);transition:transform .2s}
+.card.red{color:#c1121f}
+.card i{position:absolute;top:4px;left:6px;font-style:normal;font-size:.42em;line-height:1.05}
+.card.back{background:repeating-linear-gradient(45deg,#7f1d1d,#7f1d1d 6px,#991b1b 6px,#991b1b 12px);border:3px solid #fff}
+.card.man{box-shadow:0 0 0 3px var(--gold),0 2px 6px #0008}
+#hand .card{cursor:pointer}
+#hand .card:hover{transform:translateY(-8px)}
+#hand.off .card{cursor:default;opacity:.75}
+#hand.off .card:hover{transform:none}
+.drop{animation:drop .3s}
+@keyframes drop{from{transform:translateY(-30px) scale(1.1);opacity:0}}
+#act{display:flex;gap:10px;justify-content:center;min-height:56px;padding:6px}
+button{font:inherit;font-weight:700;border:0;border-radius:10px;padding:12px 18px;background:var(--gold);color:#222;cursor:pointer;min-height:44px}
+#bOk{background:#22c55e;color:#fff}#bRun{background:#ef4444;color:#fff}
+#msg{position:fixed;left:50%;top:46%;transform:translate(-50%,-50%);background:#000b;color:var(--gold);padding:10px 22px;border-radius:12px;font-size:1.6em;font-weight:800;opacity:0;transition:opacity .2s;pointer-events:none;white-space:nowrap;z-index:5}
+#ov{position:fixed;inset:0;background:#000c;display:flex;align-items:center;justify-content:center;z-index:9}
+#ov.hide{display:none}
+.box{background:var(--felt2);border:2px solid var(--gold);border-radius:16px;padding:24px;text-align:center;max-width:90%}
+.box h1{margin:0 0 6px}
+#dif{display:flex;gap:8px;margin:16px 0;justify-content:center}
+#dif button{background:#fff2;color:#fff}
+#dif button.sel,#mode button.sel{background:var(--gold);color:#222}
+#mode{display:flex;gap:8px;justify-content:center;margin-bottom:16px}#mode button{background:#fff2;color:#fff}
+.grp{text-align:center;font-size:.65em;opacity:.95}.grp .row{min-height:0;gap:3px}#opp{gap:10px}
+#opp.n4 .card{--w:36px;--h:52px}#table.n4 .card{--w:48px;--h:70px}
+</style></head><body>
+<header><div class="sc">Nós <b id="s1">0</b> x <b id="s2">0</b> Eles</div><div id="info"></div><button id="snd">🔊</button></header>
+<main>
+<div class="row" id="opp"></div>
+<div class="row" id="mid"><div id="viraBox">Vira<div id="vira"></div></div><div id="table" class="row"></div><div id="sp" style="width:var(--w)"></div></div>
+<div class="row" id="hand" class="off"></div>
+<div id="act"><button id="bT">Truco!</button><button id="bOk">Aceitar</button><button id="bRun">Correr</button></div>
+</main>
+<div id="msg"></div>
+<div id="ov"><div class="box"><h1 id="ovh">Truco Paulista</h1><p id="ovp">Primeiro a 12 pontos</p>
+<div id="dif"><button data-d="0">Fácil</button><button data-d="1" class="sel">Médio</button><button data-d="2">Difícil</button></div>
+<div id="mode"><button data-n="2" class="sel">1x1</button><button data-n="4">2x2</button></div>
+<button id="go">Jogar</button></div></div>
+<script>
+// Ordem das cartas (fraca → forte) e naipes das manilhas (Ouros < Espadas < Copas < Paus)
+const R=["4","5","6","7","Q","J","K","A","2","3"],S=["♦","♠","♥","♣"];
+const NEXT={1:3,3:6,6:9,9:12},NAME={3:"Truco",6:"Seis",9:"Nove",12:"Doze"},THR={3:5,6:6.5,9:8,12:9.5};
+const $=id=>document.getElementById(id),sleep=ms=>new Promise(r=>setTimeout(r,ms));
+let G={me:0,cpu:0,diff:1,n:2,starter:0,mute:false},H,man,pend=null;
+// 2x2: assentos 0 (você), 1 (eles), 2 (parceiro), 3 (eles). Time = assento par → nós, ímpar → eles
+const tm=s=>s%2?"cpu":"me",SE=s=>s%2?(G.n==4?[1,3]:[1]):[2],NM=()=>G.n==4?["Você","Eles","Parceiro","Eles"]:["Você","Eles"];
+
+function beep(f=440){if(G.mute)return;try{const a=G.ac||(G.ac=new AudioContext()),o=a.createOscillator(),g=a.createGain();o.frequency.value=f;g.gain.value=.05;o.connect(g);g.connect(a.destination);o.start();o.stop(a.currentTime+.08)}catch(e){}}
+const pw=c=>c.r==man?10+c.s:R.indexOf(c.r);
+
+function el(c,back){const d=document.createElement("div");
+ d.className="card"+(back?" back":c.s%2?"":" red")+(!back&&c.r==man?" man":"");
+ if(!back)d.innerHTML=`<i>${c.r}<br>${S[c.s]}</i>${c.r}${S[c.s]}`;return d}
+async function say(t,ms=900){const m=$("msg");m.textContent=t;m.style.opacity=1;beep(660);await sleep(ms);m.style.opacity=0}
+function render(){
+ $("s1").textContent=G.me;$("s2").textContent=G.cpu;
+ $("info").textContent="Mão vale "+H.val+" · "+(H.w.map(x=>x=="me"?"●":x=="cpu"?"○":"✕").join(" ")||"–");
+ const h=$("hand");h.innerHTML="";H.hands[0].forEach((c,i)=>{const d=el(c);d.onclick=()=>act({play:i});h.appendChild(d)});
+ const o=$("opp");o.innerHTML="";o.className="row"+(G.n==4?" n4":"");NM().forEach((nm,s)=>{if(!s)return;const g=document.createElement("div"),r=document.createElement("div");g.className="grp";r.className="row";H.hands[s].forEach(()=>r.appendChild(el(0,1)));g.append(r,nm);o.appendChild(g)});$("sp").style.display=G.n==4?"none":"";
+ const t=$("table");t.innerHTML="";t.className="row"+(G.n==4?" n4":"");for(let s=0;s<G.n;s++)if(H.t[s]){const w=document.createElement("div"),d=el(H.t[s]),l=document.createElement("small");d.classList.add("drop");l.textContent=NM()[s];l.style.cssText="display:block;text-align:center;font-size:.65em;opacity:.8";w.append(d,l);t.appendChild(w)}
+}
+const ask=()=>new Promise(r=>pend=r);
+function act(a){if(pend){const p=pend;pend=null;p(a)}}
+function btns(t,ok,run,label){$("bT").style.display=t?"":"none";$("bT").textContent=label||"Truco!";$("bOk").style.display=ok?"":"none";$("bRun").style.display=run?"":"none"}
+$("bT").onclick=()=>act({truco:1});$("bOk").onclick=()=>act({ok:1});$("bRun").onclick=()=>act({run:1});
+
+// ---------- IA do computador ----------
+// força da mão = média das 2 melhores cartas + bônus por rodadas ganhas + ruído (menor no difícil)
+const bon=s=>(H.w.filter(x=>x==tm(s)).length-H.w.filter(x=>x!="t"&&x!=tm(s)).length)*2;
+const nz=()=>(Math.random()-.5)*[6,3,1][G.diff];
+const str=(s=1)=>{const p=SE(s).flatMap(q=>H.hands[q]).map(pw).sort((a,b)=>b-a).slice(0,2);return p.reduce((a,b)=>a+b,0)/(p.length||1)+bon(s)+nz()};
+function cpuAns(nv){const s=str(),t=THR[nv];
+ if(G.diff&&nv<12&&s>=t+3)return"raise";
+ return s>=t||(G.diff==2&&Math.random()<.12)?"ok":"run"} // difícil também blefa aceitando
+function cpuWants(s=1){if(!G.diff)return Math.random()<.03;
+ return (Math.random()<.45&&str(s)>=THR[NEXT[H.val]]+1.5)||(G.diff==2&&Math.random()<.06)} // blefe
+function cpuPick(q){const hd=H.hands[q],s=[...hd].sort((a,b)=>pw(a)-pw(b));let o=null,ot="";H.t.forEach((x,i)=>{if(!o||pw(x)>pw(o)){o=x;ot=tm(i)}});let c;
+ if(o){c=s.find(x=>pw(x)>pw(o));if(!c||ot==tm(q)||(!G.diff&&Math.random()<.3))c=s[0]}
+ else if(H.round==0)c=G.diff?s[1]:s[Math.floor(Math.random()*3)];
+ else c=s[s.length-1];
+ hd.splice(hd.indexOf(c),1);return c}
+
+// ---------- Truco / aumentos ----------
+async function raise(by){
+ const o=by=="me"?"cpu":"me",nv=NEXT[H.val];let r;
+ await say(NAME[nv]+"!");
+ if(by=="me")r=cpuAns(nv);
+ else{btns(nv<12,1,1,nv<12&&NAME[NEXT[nv]]+"!");let a;
+  do a=await ask();while(!(a.ok||a.run||a.truco));
+  btns(0,0,0);r=a.ok?"ok":a.run?"run":"raise"}
+ if(r=="run"){await say(o=="me"?"Corri!":"Eu corro!");H.over=1;H.win=by;H.pts=H.val;return}
+ H.val=nv;H.last=by;render();
+ if(r=="raise")return raise(o);
+ await say("Aceito!",600);
+}
+
+// ---------- Jogada ----------
+async function turn(w){
+ if(w==0){
+  $("hand").classList.remove("off");
+  for(;;){
+   btns(H.last!="me"&&H.val<12&&!H.noRaise,0,0,NAME[NEXT[H.val]]+"!");
+   const a=await ask();
+   if(a.truco){btns(0,0,0);await raise("me");if(H.over)return;continue}
+   if(a.play!==undefined){H.t[0]=H.hands[0].splice(a.play,1)[0];beep(300);break}
+  }
+  btns(0,0,0);$("hand").classList.add("off");render();
+ }else{
+  $("hand").classList.add("off");await sleep(600);
+  if(H.last!=tm(w)&&H.val<12&&!H.noRaise&&cpuWants(w)){await raise(tm(w));if(H.over)return}
+  H.t[w]=cpuPick(w);beep(250);render();await sleep(300);
+ }
+}
+// 0 = indefinido; empates ("embucha"): 1ª empatada → vale a 2ª; 2ª empatada → vale a 1ª; tudo empatado → quem começou a mão
+function decide(w){const[a,b,c]=w;
+ if(w.length<2)return 0;
+ if(w.length==2){if(a!="t"&&(b==a||b=="t"))return a;if(a=="t"&&b!="t")return b;return 0}
+ if(c!="t")return c;if(a!="t")return a;if(b!="t")return b;return tm(G.starter)}
+async function hand(){
+ const d=[];for(let s=0;s<4;s++)for(const r of R)d.push({r,s});
+ for(let i=39;i>0;i--){const j=Math.random()*(i+1)|0;[d[i],d[j]]=[d[j],d[i]]}
+ const vira=d.pop();man=R[(R.indexOf(vira.r)+1)%10];
+ H={val:1,last:null,w:[],t:[],round:0,lead:G.starter,hands:Array.from({length:G.n},()=>d.splice(0,3)),over:0};
+ $("vira").replaceChildren(el(vira));render();
+ // Mão de ferro (11x11): vale 1, sem aumentos. Mão de onze: quem tem 11 vê as cartas e joga (vale 3) ou corre (adversário ganha 1)
+ if(G.me==11&&G.cpu==11){H.noRaise=1;await say("Mão de ferro! Sem aumentos",1400)}
+ else if(G.me==11){H.noRaise=1;$("bOk").textContent="Jogar (vale 3)";btns(0,1,1);let a;
+  do a=await ask();while(!(a.ok||a.run));btns(0,0,0);$("bOk").textContent="Aceitar";
+  if(a.run){await say("Corri!");H.over=1;H.win="cpu";H.pts=1}else H.val=3}
+ else if(G.cpu==11){H.noRaise=1;
+  if(str()>=5){H.val=3;render();await say("Eles jogam a mão de onze!",1300)}
+  else{await say("Eles correram da mão de onze!",1300);H.over=1;H.win="me";H.pts=1}}
+ for(H.round=0;H.round<3&&!H.over;H.round++){
+  for(let k=0;k<G.n;k++){await turn((H.lead+k)%G.n);if(H.over)break}
+  if(H.over)break;
+  let mx=-1,ws=[];for(let k=0;k<G.n;k++){const s=(H.lead+k)%G.n,p=pw(H.t[s]);if(p>mx){mx=p;ws=[s]}else if(p==mx)ws.push(s)}
+  const r=new Set(ws.map(tm)).size>1?"t":tm(ws[0]);
+  H.w.push(r);if(r!="t")H.lead=ws[0];
+  render();await say(r=="me"?"Rodada nossa!":r=="cpu"?"Rodada deles!":"Empate!",800);
+  H.t=[];render();
+  const x=decide(H.w);if(x){H.over=1;H.win=x;H.pts=H.val}
+ }
+ G[H.win]+=H.pts;render();
+ await say((H.win=="me"?"Nós ganhamos ":"Eles ganharam ")+H.pts+(H.pts>1?" pontos":" ponto"),1400);
+}
+async function game(){
+ while(G.me<12&&G.cpu<12){await hand();G.starter=(G.starter+1)%G.n}
+ $("ovh").textContent=G.me>=12?"Você venceu! 🎉":"Eles venceram";
+ $("ovp").textContent="Nós "+G.me+" x "+G.cpu+" Eles";$("go").textContent="Jogar de novo";$("ov").classList.remove("hide");
+}
+document.querySelectorAll("#dif button").forEach(b=>b.onclick=()=>{G.diff=+b.dataset.d;document.querySelectorAll("#dif button").forEach(x=>x.classList.toggle("sel",x==b))});
+document.querySelectorAll("#mode button").forEach(b=>b.onclick=()=>{G.n=+b.dataset.n;document.querySelectorAll("#mode button").forEach(x=>x.classList.toggle("sel",x==b))});
+$("go").onclick=()=>{G.me=G.cpu=0;G.starter=Math.random()*G.n|0;$("ov").classList.add("hide");game()};
+$("snd").onclick=()=>{G.mute=!G.mute;$("snd").textContent=G.mute?"🔇":"🔊"};
+btns(0,0,0);
+</script></body></html>
